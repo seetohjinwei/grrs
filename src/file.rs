@@ -1,78 +1,92 @@
-use anyhow::{Result};
+use anyhow::Result;
 
 use std::collections::HashSet;
-use std::io::{Read};
+use std::io::Read;
 use std::path::PathBuf;
 
-fn is_text_file(path: &PathBuf, buffer: &mut [u8]) -> bool {
-    let Ok(mut file) = std::fs::File::open(path) else {
-        return false;
-    };
-    let Ok(n) = file.read(buffer) else {
-        return false;
-    };
-
-    let sample = &buffer[..n];
-
-    !sample.contains(&0) && std::str::from_utf8(sample).is_ok()
+pub struct Walker {
+    seen_paths: HashSet<PathBuf>,
+    file_paths: Vec<PathBuf>,
+    probe_buffer: [u8; 1024],
 }
 
-fn get_file_paths_helper(
-    seen_paths: &mut HashSet<PathBuf>,
-    file_paths: &mut Vec<PathBuf>,
-    probe_buffer: &mut [u8],
-    path: PathBuf,
-    remaining_depth: u32,
-) -> Result<()> {
-    if seen_paths.contains(&path) {
-        return Ok(());
-    }
-    seen_paths.insert(path.clone());
+// TODO: Support ignore
 
-    if path.is_file() {
-        if is_text_file(&path, probe_buffer) {
-            file_paths.push(path);
-        }
-        return Ok(());
-    }
+impl Walker {
+    pub fn new() -> Self {
+        let seen_paths = HashSet::new();
+        let file_paths = Vec::new();
+        let probe_buffer = [0u8; 1024];
 
-    if !path.is_dir() {
-        return Ok(());
-    }
-
-    if remaining_depth == 0 {
-        return Ok(());
-    }
-
-    for entry in std::fs::read_dir(path)? {
-        let entry = entry?;
-        let child = entry.path();
-        get_file_paths_helper(
+        Self {
             seen_paths,
             file_paths,
             probe_buffer,
-            child,
-            remaining_depth - 1,
-        )?;
+        }
     }
 
-    Ok(())
-}
+    pub fn collect_file_paths(
+        mut self,
+        paths: Vec<PathBuf>,
+        max_depth: u32,
+    ) -> Result<Vec<PathBuf>> {
+        let max_depth = max_depth.saturating_add(1);
 
-pub fn get_file_paths(paths: Vec<PathBuf>, max_depth: u32) -> Result<Vec<PathBuf>> {
-    let mut probe_buffer = [0u8; 1024];
-    let mut seen_paths = HashSet::new();
-    let mut file_paths = Vec::new();
+        for path in paths {
+            self.search_path(path, max_depth)?;
+        }
 
-    for path in paths {
-        get_file_paths_helper(
-            &mut seen_paths,
-            &mut file_paths,
-            &mut probe_buffer,
-            path,
-            max_depth + 1,
-        )?;
+        Ok(self.file_paths)
     }
 
-    Ok(file_paths)
+    fn is_text_file(&mut self, path: &PathBuf) -> bool {
+        let Ok(mut file) = std::fs::File::open(path) else {
+            return false;
+        };
+        let Ok(n) = file.read(&mut self.probe_buffer) else {
+            return false;
+        };
+
+        let sample = &self.probe_buffer[..n];
+
+        !sample.contains(&0) && std::str::from_utf8(sample).is_ok()
+    }
+
+    fn search_path(&mut self, path: PathBuf, remaining_depth: u32) -> Result<()> {
+        if !self.seen_paths.insert(path.clone()) {
+            // insert returns False if it was already in the Set
+            return Ok(());
+        }
+
+        // Don't follow symlinks
+        // Get the metadata once (it requires a syscall)
+        let metadata = path.symlink_metadata()?;
+
+        if metadata.is_symlink() {
+            return Ok(());
+        }
+
+        if metadata.is_file() {
+            if self.is_text_file(&path) {
+                self.file_paths.push(path);
+            }
+            return Ok(());
+        }
+
+        if !metadata.is_dir() {
+            return Ok(());
+        }
+
+        if remaining_depth == 0 {
+            return Ok(());
+        }
+
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            let child = entry.path();
+            self.search_path(child, remaining_depth - 1)?;
+        }
+
+        Ok(())
+    }
 }

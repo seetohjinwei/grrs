@@ -31,7 +31,8 @@ fn main() -> Result<()> {
         args.paths
     };
     // TODO: Respect gitignore!
-    let file_paths = grrs::file::get_file_paths(paths, args.max_depth)?;
+    let walker = grrs::file::Walker::new();
+    let file_paths = walker.collect_file_paths(paths, args.max_depth)?;
 
     // TODO: Parallelize this loop
     // but since we will be sharing std::io::stdout, we will have to create separate writers
