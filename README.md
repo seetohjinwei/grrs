@@ -12,5 +12,11 @@ Follows the tutorial from: https://rust-cli.github.io/book/index.html
 * Shows line numbers by default
 
 ```sh
+cargo run -- --help
+
 RUST_LOG=debug cargo run -- pattern src/main.rs
+RUST_LOG=debug cargo run -- pattern
+
+cargo fmt
+cargo test
 ```
