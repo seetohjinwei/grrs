@@ -1,5 +1,6 @@
-use anyhow::{Result};
+use anyhow::{Context, Result};
 use clap::Parser;
+use log::debug;
 
 #[derive(Parser)]
 struct Args {
@@ -12,7 +13,12 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    grrs::find_matches(args.pattern, &args.path)?;
+    let f = std::fs::File::open(&args.path)
+        .with_context(|| format!("could not read file {:?}", &args.path))?;
+    let reader = std::io::BufReader::new(f);
+
+    debug!("Searching for {}", &args.pattern);
+    grrs::find_matches(reader, std::io::stdout(), &args.pattern)?;
 
     Ok(())
 }
