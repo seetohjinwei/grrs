@@ -1,4 +1,6 @@
+use anyhow::{Context, Result};
 use clap::Parser;
+
 use std::io::BufRead;
 
 #[derive(Parser)]
@@ -7,20 +9,24 @@ struct Args {
     path: std::path::PathBuf,
 }
 
-fn grep_file(pattern: String, path: std::path::PathBuf) {
-    let f = std::fs::File::open(path).expect("could not open file");
+fn grep_file(pattern: String, path: &std::path::PathBuf) -> Result<()> {
+    let f = std::fs::File::open(path).with_context(|| format!("could not read file {:?}", path))?;
     let reader = std::io::BufReader::new(f);
 
     for line in reader.lines() {
-        let message = line.expect("could not read new line");
+        let message = line.with_context(|| format!("could not read line from {:?}", path))?;
         if message.contains(&pattern) {
             println!("{}", message)
         }
     }
+
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
 
-    grep_file(args.pattern, args.path);
+    grep_file(args.pattern, &args.path)?;
+
+    Ok(())
 }
