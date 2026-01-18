@@ -1,4 +1,4 @@
 pub mod file;
-pub mod writer;
-pub mod matcher;
 pub mod ignore;
+pub mod matcher;
+pub mod writer;
