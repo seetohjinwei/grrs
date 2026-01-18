@@ -30,8 +30,12 @@ fn main() -> Result<()> {
     } else {
         args.paths
     };
+    // TODO: Respect gitignore!
     let file_paths = grrs::get_file_paths(paths, args.max_depth)?;
 
+    // TODO: Parallelize this loop
+    // but since we will be sharing std::io::stdout, we will have to create separate writers
+    // and flush each writer in a single operation
     for file_path in file_paths {
         let f = std::fs::File::open(&file_path)
             .with_context(|| format!("could not read file {:?}", file_path))?;
