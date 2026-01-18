@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         args.paths
     };
     // TODO: Respect gitignore!
-    let file_paths = grrs::get_file_paths(paths, args.max_depth)?;
+    let file_paths = grrs::file::get_file_paths(paths, args.max_depth)?;
 
     // TODO: Parallelize this loop
     // but since we will be sharing std::io::stdout, we will have to create separate writers
@@ -43,13 +43,13 @@ fn main() -> Result<()> {
 
         // header will only be printed if something was actually written
         let header = format!("{}:", file_path.display().to_string());
-        let writer = grrs::LazyWriter::new(std::io::stdout(), header);
+        let writer = grrs::writer::LazyWriter::new(std::io::stdout(), header);
 
-        match grrs::find_matches(
+        match grrs::matcher::find_matches(
             reader,
             writer,
             &args.pattern,
-            &grrs::MatchOptions {
+            &grrs::matcher::MatchOptions {
                 show_line_numbers: !args.no_line_numbers,
                 case_insensitive: args.ignore_case,
             },
