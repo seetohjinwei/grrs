@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use log::{debug};
 
 use std::io::BufRead;
 
@@ -10,6 +11,8 @@ struct Args {
 }
 
 fn grep_file(pattern: String, path: &std::path::PathBuf) -> Result<()> {
+    debug!("Searching for {} in {:?}", &pattern, &path);
+
     let f = std::fs::File::open(path).with_context(|| format!("could not read file {:?}", path))?;
     let reader = std::io::BufReader::new(f);
 
@@ -24,6 +27,8 @@ fn grep_file(pattern: String, path: &std::path::PathBuf) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let args = Args::parse();
 
     grep_file(args.pattern, &args.path)?;
