@@ -19,4 +19,10 @@ RUST_LOG=debug cargo run -- pattern
 
 cargo fmt
 cargo test
+
+cargo build
+target/debug/grrs --help
+
+cargo build --release
+target/release/grrs --help
 ```
