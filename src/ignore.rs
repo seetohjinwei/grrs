@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use log::debug;
+use log::warn;
 use regex::RegexSet;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
-pub struct Ignore {
+pub struct GitIgnore {
     patterns: RegexSet,
 }
 
@@ -18,12 +18,12 @@ fn glob_to_regex(glob: &str) -> String {
     if glob.starts_with('/') {
         chars.next();
     } else {
-        regex.push_str("(?:.*/)");
+        regex.push_str("(?:^|.*/)");
     }
 
     for c in chars {
         match c {
-            '.' | '+' | '(' | ')' | '|' | '^' | '$' | '{' | '}' => {
+            '.' | '+' | '(' | ')' | '[' | ']' | '|' | '^' | '$' | '{' | '}' => {
                 regex.push('\\');
                 regex.push(c);
             }
@@ -43,28 +43,13 @@ fn glob_to_regex(glob: &str) -> String {
     regex
 }
 
-impl Ignore {
+impl GitIgnore {
     pub fn empty() -> Self {
         let set = RegexSet::empty();
         Self { patterns: set }
     }
 
-    pub fn new(ignore_path: &PathBuf) -> Result<Self> {
-        let file_name = ignore_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .context("failed to get file name")?;
-
-        if file_name != ".gitignore" && file_name != ".ignore" {
-            debug!("unsupported ignore file: {}", file_name);
-
-            return Ok(Self::empty());
-        }
-
-        let f = std::fs::File::open(&ignore_path)
-            .with_context(|| format!("could not read file {:?}", ignore_path))?;
-        let reader = std::io::BufReader::new(f);
-
+    pub fn from<R: BufRead>(reader: R) -> Result<Self> {
         let mut patterns = Vec::new();
 
         for line in reader.lines() {
@@ -82,7 +67,91 @@ impl Ignore {
         Ok(Self { patterns: set })
     }
 
-    pub fn is_ignored(&self, path: &Path) -> bool {
+    pub fn new(ignore_path: &PathBuf) -> Result<Self> {
+        let file_name = ignore_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .context("failed to get file name")?;
+
+        if file_name != ".gitignore" && file_name != ".ignore" {
+            warn!("unsupported ignore file: {}", file_name);
+            return Ok(Self::empty());
+        }
+
+        let f = std::fs::File::open(&ignore_path)
+            .with_context(|| format!("could not read file {:?}", ignore_path))?;
+        let reader = std::io::BufReader::new(f);
+
+        Self::from(reader)
+    }
+
+    pub fn matches(&self, path: &Path) -> bool {
         self.patterns.is_match(&path.to_string_lossy())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_file_ignore() {
+        // Unanchored: should match anywhere
+        let gitignore_content = b"abc.txt";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("abc.txt")));
+        assert!(ignore.matches(&PathBuf::from("src/abc.txt")));
+        assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt")));
+        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
+    }
+
+    #[test]
+    fn test_anchored_ignore() {
+        // Anchored with leading slash: should only match root
+        let gitignore_content = b"/root_only.txt";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("root_only.txt")));
+        assert!(!ignore.matches(&PathBuf::from("subdir/root_only.txt")));
+    }
+
+    #[test]
+    fn test_extension_wildcard() {
+        let gitignore_content = b"*.log";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("error.log")));
+        assert!(ignore.matches(&PathBuf::from("build/output.log")));
+        assert!(!ignore.matches(&PathBuf::from("log.txt")));
+    }
+
+    #[test]
+    fn test_directory_ignore() {
+        // Trailing slash: matches everything inside the folder
+        let gitignore_content = b"target/";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("target/debug/app")));
+        assert!(ignore.matches(&PathBuf::from("src/target/old_build")));
+        assert!(ignore.matches(&PathBuf::from("target/")));
+    }
+
+    #[test]
+    fn test_regex_escaping() {
+        // Test that special regex characters in filenames are escaped
+        let gitignore_content = b"data()[1].{txt}";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("data()[1].{txt}")));
+    }
+
+    #[test]
+    fn test_ignore() {
+        let gitignore_content = b"abc.txt";
+        let ignore = GitIgnore::from(&gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("abc.txt")));
+        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
     }
 }
