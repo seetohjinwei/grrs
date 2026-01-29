@@ -1,3 +1,5 @@
+use std::fs;
+
 use anyhow::{Context, Result};
 use clap::Parser;
 
@@ -30,8 +32,40 @@ fn main() -> Result<()> {
     } else {
         args.paths
     };
-    // TODO: Respect gitignore!
-    let walker = grrs::file::Walker::new();
+
+    // TODO: Figure out difference between PathBuf and Path
+    // TODO: Avoid borrowing if we can!
+
+    // TODO: Support discovering nested .gitignore files!
+    let gitignore_path = std::path::PathBuf::from(".gitignore");
+    let gitignore_path = fs::canonicalize(gitignore_path)?;
+    println!(
+        "gitignore_path: {:?} {:?}",
+        gitignore_path,
+        gitignore_path.parent()
+    );
+    let gitignore = if gitignore_path.exists() {
+        grrs::ignore::GitIgnore::new(gitignore_path)
+            .unwrap_or_else(|_| grrs::ignore::GitIgnore::empty())
+    } else {
+        grrs::ignore::GitIgnore::empty()
+    };
+
+    println!("gitignore is empty? {}", gitignore.is_empty(),);
+    println!(
+        "gitignore matches this? {}",
+        gitignore.matches(&std::path::PathBuf::from(
+            "/Users/jinwei/git/grrs/target/debug/deps/aho_corasick-5b59191718e068af.d"
+        ))
+    );
+    println!(
+        "gitignore matches this? {}",
+        gitignore.matches(&std::path::PathBuf::from(
+            "/Users/jinwei/git/grrs/target/debug/deps/libaho_corasick-5b59191718e068af.rmeta:"
+        ))
+    );
+
+    let walker = grrs::walker::Walker::new(gitignore);
     let file_paths = walker.collect_file_paths(paths, args.max_depth)?;
 
     // TODO: Parallelize this loop

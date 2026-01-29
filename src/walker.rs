@@ -4,7 +4,11 @@ use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
 
+use crate::ignore;
+
 pub struct Walker {
+    gitignore: ignore::GitIgnore,
+
     seen_paths: HashSet<PathBuf>,
     file_paths: Vec<PathBuf>,
     probe_buffer: [u8; 1024],
@@ -13,12 +17,13 @@ pub struct Walker {
 // TODO: Support ignore
 
 impl Walker {
-    pub fn new() -> Self {
+    pub fn new(gitignore: ignore::GitIgnore) -> Self {
         let seen_paths = HashSet::new();
         let file_paths = Vec::new();
         let probe_buffer = [0u8; 1024];
 
         Self {
+            gitignore,
             seen_paths,
             file_paths,
             probe_buffer,
@@ -53,6 +58,12 @@ impl Walker {
     }
 
     fn search_path(&mut self, path: PathBuf, remaining_depth: u32) -> Result<()> {
+        println!("gitignore matches {:?}? {}", path, self.gitignore.matches(&path),);
+
+        if self.gitignore.matches(&path) {
+            return Ok(());
+        }
+
         if !self.seen_paths.insert(path.clone()) {
             // insert returns False if it was already in the Set
             return Ok(());
