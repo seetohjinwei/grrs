@@ -20,7 +20,7 @@ impl Default for MatchOptions {
 pub fn find_matches<R: BufRead, W: std::io::Write>(
     reader: R,
     mut writer: W,
-    pattern: &String,
+    pattern: &str,
     options: &MatchOptions,
 ) -> Result<()> {
     let pattern_regex = RegexBuilder::new(pattern)
