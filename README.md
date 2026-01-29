@@ -26,3 +26,8 @@ target/debug/grrs --help
 cargo build --release
 target/release/grrs --help
 ```
+
+## Reference links
+
+* https://git-scm.com/docs/gitignore
+* https://wasabifan.github.io/combinator-quick-reference/
