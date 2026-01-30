@@ -79,7 +79,7 @@ fn convert_pattern(pattern: &str) -> String {
     // TODO: Handle the following rule
     // a backslash at the end of a pattern is an invalid pattern that never matches!
 
-    let parts = crate::escaped_strings::split(pattern, DIR_SEP);
+    let parts: Vec<String> = crate::escaped_strings::split(pattern, DIR_SEP).collect();
 
     let mut regex = String::new();
 

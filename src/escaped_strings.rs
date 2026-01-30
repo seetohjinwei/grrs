@@ -1,5 +1,6 @@
 /// Utility functions for string operations that support escaping.
 
+// We do not always support using escape char as a target.
 const ESCAPE_CHAR: char = '\\';
 
 /// Finds a character in a string if it is not escaped.
@@ -53,38 +54,61 @@ pub fn trim_end(mut string: String) -> String {
     string
 }
 
-/// Returns a vector of substrings of this string slice, separated by the specified character.
-pub fn split(string: &str, split_by: char) -> Vec<String> {
-    // TODO: Figure out how we can return an iterator!
+pub struct Split<'a> {
+    chars: core::str::Chars<'a>,
+    split_by: char,
+    is_escaped: bool,
+    done: bool,
+}
 
-    let mut substrings: Vec<String> = Vec::new();
-    let mut current_string = String::new();
+impl<'a> Iterator for Split<'a> {
+    type Item = String;
 
-    let mut is_escaped = false;
-
-    for c in string.chars() {
-        if is_escaped {
-            current_string.push(c);
-            is_escaped = false;
-            continue;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
         }
 
-        if c == split_by {
-            substrings.push(current_string);
-            current_string = String::new();
-        } else if c == ESCAPE_CHAR {
-            current_string.push(c);
-            is_escaped = !is_escaped;
-        } else {
-            current_string.push(c);
+        let mut substring = String::new();
+
+        loop {
+            let Some(c) = self.chars.next() else {
+                self.done = true;
+                break;
+            };
+
+            if self.is_escaped {
+                substring.push(c);
+                self.is_escaped = false;
+                continue;
+            }
+
+            if c == ESCAPE_CHAR {
+                substring.push(c);
+                self.is_escaped = !self.is_escaped;
+            } else if c == self.split_by {
+                break;
+            } else {
+                substring.push(c);
+            }
         }
-    }
 
-    if !current_string.is_empty() {
-        substrings.push(current_string)
+        Some(substring)
     }
+}
 
-    substrings
+/// Returns an iterator of substrings of this string slice, separated by the specified character.
+// We implemented it to return an iterator to learn about iterators :)
+pub fn split(string: &str, split_by: char) -> Split<'_> {
+    // We do not support this!
+    assert_ne!(split_by, ESCAPE_CHAR);
+
+    Split {
+        chars: string.chars(),
+        split_by: split_by,
+        is_escaped: false,
+        done: false,
+    }
 }
 
 #[cfg(test)]
@@ -164,14 +188,28 @@ mod tests {
     #[test]
     fn test_split() {
         // Empty string
-        assert_eq!(split("", '!'), Vec::<String>::new());
+        assert_eq!("".split('!').collect::<Vec<_>>(), vec![""]);
+        assert_eq!(split("", '!').collect::<Vec<String>>(), vec![""]);
         // No matches
-        assert_eq!(split("abc", '!'), vec!["abc"]);
+        assert_eq!(split("abc", '!').collect::<Vec<String>>(), vec!["abc"]);
+        // Split at start
+        assert_eq!(split("/abc", '/').collect::<Vec<String>>(), vec!["", "abc"]);
+        // Split at end
+        assert_eq!(split("abc/", '/').collect::<Vec<String>>(), vec!["abc", ""]);
         // Simple match
-        assert_eq!(split("abc,def,ghi", ','), vec!["abc", "def", "ghi"]);
+        assert_eq!(
+            split("abc,def,ghi", ',').collect::<Vec<String>>(),
+            vec!["abc", "def", "ghi"]
+        );
         // Escaped split character
-        assert_eq!(split(r"abc\,def\,ghi", ','), vec![r"abc\,def\,ghi"]);
+        assert_eq!(
+            split(r"abc\,def\,ghi", ',').collect::<Vec<String>>(),
+            vec![r"abc\,def\,ghi"]
+        );
         // Mixed escaped and un-escaped split characters
-        assert_eq!(split(r"abc\,def,ghi", ','), vec![r"abc\,def", "ghi"]);
+        assert_eq!(
+            split(r"abc\,def,ghi", ',').collect::<Vec<String>>(),
+            vec![r"abc\,def", "ghi"]
+        );
     }
 }
