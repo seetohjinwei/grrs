@@ -4,6 +4,11 @@ use regex::RegexSet;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
+// Check why a file is ignored.
+// git check-ignore -v <FILE> [FILE...]
+
+const DIR_SEP: char = '/';
+
 pub struct GitIgnore {
     root_path: PathBuf,
     patterns: RegexSet,
@@ -34,8 +39,58 @@ fn clean_pattern(pattern: String) -> String {
 /// Converts pattern from gitignore syntax to regex syntax.
 ///
 /// Reference link: https://git-scm.com/docs/gitignore
-fn convert_pattern(_pattern: &str) -> String {
-    let regex = String::from("");
+fn convert_pattern(pattern: &str) -> String {
+    const ASTERISK: char = '*';
+    const DOUBLE_ASTERISK: &str = "**";
+
+    let parts: Vec<&str> = pattern.split(DIR_SEP).collect();
+
+    let mut regex = String::from("");
+
+    // Has separator at the beginning or middle (or both)
+    // => has a non-ending separator
+    // => has multiple separators or the only separator is not an ending separator
+    let has_multiple_separators = parts.len() >= 3;
+    let has_non_ending_separator = parts.len() >= 2 && !parts[parts.len() - 1].is_empty();
+
+    for (i, part) in parts.iter().enumerate() {
+        let is_leading = i == 0;
+        let is_trailing = i == parts.len() - 1;
+
+        println!(
+            "{} {}: {} {} {} {}",
+            i, part,
+            is_leading,
+            has_multiple_separators,
+            has_non_ending_separator,
+            *part != DOUBLE_ASTERISK
+        );
+
+        if is_leading
+            && (has_multiple_separators || has_non_ending_separator)
+            && *part != DOUBLE_ASTERISK
+        {
+            // 1. If there is a separator at the beginning or middle (or both) of the pattern, then the pattern is relative to the directory level of the particular .gitignore file itself. Otherwise the pattern may also match at any level below the .gitignore level.
+            // e.g. `dir/a.txt` matches `dir/a.txt` but not `dir2/dir/a.txt`.
+            // e.g. `dir/`      matches `dir/`      and     `dir2/dir/`.
+            // 2. leading `**/` overrides rule 1
+            regex.push('^');
+        }
+
+        if is_leading && *part == DOUBLE_ASTERISK {}
+    }
+
+    // 3. trailing `/**` matches everything inside some directory
+    // e.g. `abc/**` matches all files inside `abc` recursively
+    // 4. a slash followed by two consecutive asterisks then a slash matches zero or more directories
+    // e.g. `a/**/b` matches `a/b`, `a/x/b` and `a/x/y/b`
+    // 5. other consecutive asterisks are considered regular asterisks!
+
+    // 1. `*` matches anything except a slash (e.g. r"[^\\]*")
+    // 2. `?` matches any one character except a slash (e.g. r"[^\\]")
+    // 3. backslash `\` escapes special characters
+    // 4. range notation `[a-zA-Z]`
+    // 5. a backslash at the end of a pattern is an invalid pattern that never matches!
 
     // TODO: Implement this function!
 
@@ -155,6 +210,18 @@ mod tests {
             remove_comment(String::from(r"/\#hashtag\#/  # COMMENT! #")),
             r"/\#hashtag\#/  "
         );
+    }
+
+    #[test]
+    fn test_convert_pattern() {
+        // Empty pattern
+        assert_eq!(convert_pattern(&String::from("")), r"");
+        // Basic file
+        assert_eq!(convert_pattern(&String::from("abc.txt")), r"");
+        // Handle beginning separator
+        assert_eq!(convert_pattern(&String::from("/abc")), r"^");
+        // Handle middle separator
+        assert_eq!(convert_pattern(&String::from("dir/a.txt")), r"^");
     }
 }
 
