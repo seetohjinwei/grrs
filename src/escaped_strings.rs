@@ -20,6 +20,7 @@ pub fn find_char(string: &str, target_char: char) -> Option<usize> {
     None
 }
 
+/// Returns a string slice with trailing whitespace removed.
 pub fn trim_end(mut string: String) -> String {
     // We can treat the UTF-8 string as bytes because
     // we only compare against ' ' (SPACE) and ESCAPE_CHAR which are both single-byte characters.
@@ -50,6 +51,40 @@ pub fn trim_end(mut string: String) -> String {
 
     string.truncate(last_valid_idx);
     string
+}
+
+/// Returns a vector of substrings of this string slice, separated by the specified character.
+pub fn split(string: &str, split_by: char) -> Vec<String> {
+    // TODO: Figure out how we can return an iterator!
+
+    let mut substrings: Vec<String> = Vec::new();
+    let mut current_string = String::new();
+
+    let mut is_escaped = false;
+
+    for c in string.chars() {
+        if is_escaped {
+            current_string.push(c);
+            is_escaped = false;
+            continue;
+        }
+
+        if c == split_by {
+            substrings.push(current_string);
+            current_string = String::new();
+        } else if c == ESCAPE_CHAR {
+            current_string.push(c);
+            is_escaped = !is_escaped;
+        } else {
+            current_string.push(c);
+        }
+    }
+
+    if !current_string.is_empty() {
+        substrings.push(current_string)
+    }
+
+    substrings
 }
 
 #[cfg(test)]
@@ -124,5 +159,19 @@ mod tests {
         // Handling unicode characters
         assert_eq!(trim_end(String::from(" 게")), " 게");
         assert_eq!(trim_end(String::from("게 ")), "게");
+    }
+
+    #[test]
+    fn test_split() {
+        // Empty string
+        assert_eq!(split("", '!'), Vec::<String>::new());
+        // No matches
+        assert_eq!(split("abc", '!'), vec!["abc"]);
+        // Simple match
+        assert_eq!(split("abc,def,ghi", ','), vec!["abc", "def", "ghi"]);
+        // Escaped split character
+        assert_eq!(split(r"abc\,def\,ghi", ','), vec![r"abc\,def\,ghi"]);
+        // Mixed escaped and un-escaped split characters
+        assert_eq!(split(r"abc\,def,ghi", ','), vec![r"abc\,def", "ghi"]);
     }
 }

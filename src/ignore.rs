@@ -37,7 +37,7 @@ fn clean_pattern(pattern: String) -> String {
 }
 
 fn convert_part(part: &str) -> String {
-    let mut regex = String::from("");
+    let mut regex = String::new();
 
     let mut is_escaped = false;
 
@@ -79,10 +79,9 @@ fn convert_pattern(pattern: &str) -> String {
     // TODO: Handle the following rule
     // a backslash at the end of a pattern is an invalid pattern that never matches!
 
-    // TODO: Implement an escaped strings implementation fo split
-    let parts: Vec<&str> = pattern.split(DIR_SEP).collect();
+    let parts = crate::escaped_strings::split(pattern, DIR_SEP);
 
-    let mut regex = String::from("");
+    let mut regex = String::new();
 
     // Has separator at the beginning or middle (or both)
     // => has a non-ending separator
@@ -96,6 +95,7 @@ fn convert_pattern(pattern: &str) -> String {
         let is_double_asterisk = *part == "**";
 
         // TODO: If there is a separator at the end of the pattern then the pattern will only match directories, otherwise the pattern can match both files and directories.
+        // Maybe we can assert that paths to `GitIgnore::matches` is a directory iff it ends in a `/`
 
         // NOTE: We're using a match statement to prove that these conditions are mutually exclusive :)
         match (
@@ -200,6 +200,9 @@ impl GitIgnore {
     }
 
     pub fn matches(&self, path: &Path) -> bool {
+        // TODO: Rewrite this
+        // It should take in a string instead of a Path object
+
         if self.root_path.as_os_str().is_empty() {
             return self.patterns.is_match(&path.to_string_lossy());
         }
