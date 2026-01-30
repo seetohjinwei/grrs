@@ -59,9 +59,12 @@ fn convert_part(part: &str) -> String {
                 regex.push('\\');
                 regex.push(c);
             }
-            '*' => regex.push_str("[^\\]*"),
-            '?' => regex.push_str("[^\\]"),
-            '\\' => is_escaped = !is_escaped,
+            '*' => regex.push_str(r"[^\\]*"),
+            '?' => regex.push_str(r"[^\\]"),
+            '\\' => {
+                regex.push(c);
+                is_escaped = !is_escaped;
+            }
             _ => regex.push(c),
         }
     }
@@ -271,76 +274,71 @@ mod tests {
         // Handle trailing middle asterisks
         assert_eq!(convert_pattern(&String::from("a/**/b")), r"^a/.*/b");
 
-        // TODO: Add more tests
+        // Handle escaped characters
+        assert_eq!(
+            convert_pattern(&String::from(r"data()\[1\].{txt}")),
+            r"data\(\)\[1\]\.\{txt\}"
+        );
+    }
+
+    #[test]
+    fn test_basic_file_ignore() {
+        // Unanchored: should match anywhere
+        let gitignore_content = b"abc.txt";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("abc.txt")));
+        assert!(ignore.matches(&PathBuf::from("src/abc.txt")));
+        assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt")));
+        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
+    }
+
+    #[test]
+    fn test_anchored_ignore() {
+        // Anchored with leading slash: should only match root
+        let gitignore_content = b"/root_only.txt";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("root_only.txt")));
+        assert!(!ignore.matches(&PathBuf::from("subdir/root_only.txt")));
+    }
+
+    #[test]
+    fn test_extension_wildcard() {
+        let gitignore_content = b"*.log";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("error.log")));
+        assert!(ignore.matches(&PathBuf::from("build/output.log")));
+        assert!(!ignore.matches(&PathBuf::from("log.txt")));
+    }
+
+    #[test]
+    fn test_directory_ignore() {
+        // Trailing slash: matches everything inside the folder
+        let gitignore_content = b"target/";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("target/debug/app")));
+        assert!(ignore.matches(&PathBuf::from("src/target/old_build")));
+        assert!(ignore.matches(&PathBuf::from("target/")));
+    }
+
+    #[test]
+    fn test_regex_escaping() {
+        // Test that special regex characters in filenames are escaped
+        let gitignore_content = br"data()\[1\].{txt}";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("data()[1].{txt}")));
+    }
+
+    #[test]
+    fn test_basic_ignore() {
+        let gitignore_content = b"abc.txt";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("abc.txt")));
+        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test_basic_file_ignore() {
-//         // Unanchored: should match anywhere
-//         let gitignore_content = b"abc.txt";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("abc.txt")));
-//         assert!(ignore.matches(&PathBuf::from("src/abc.txt")));
-//         assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt")));
-//         assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
-//     }
-//
-//     #[test]
-//     fn test_anchored_ignore() {
-//         // Anchored with leading slash: should only match root
-//         let gitignore_content = b"/root_only.txt";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("root_only.txt")));
-//         assert!(!ignore.matches(&PathBuf::from("subdir/root_only.txt")));
-//     }
-//
-//     #[test]
-//     fn test_extension_wildcard() {
-//         let gitignore_content = b"*.log";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("error.log")));
-//         assert!(ignore.matches(&PathBuf::from("build/output.log")));
-//         assert!(!ignore.matches(&PathBuf::from("log.txt")));
-//     }
-//
-//     #[test]
-//     fn test_directory_ignore() {
-//         // Trailing slash: matches everything inside the folder
-//         let gitignore_content = b"target/";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("target/debug/app")));
-//         assert!(ignore.matches(&PathBuf::from("src/target/old_build")));
-//         assert!(ignore.matches(&PathBuf::from("target/")));
-//     }
-//
-//     #[test]
-//     fn test_regex_escaping() {
-//         // Test that special regex characters in filenames are escaped
-//         let gitignore_content = b"data()[1].{txt}";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("data()[1].{txt}")));
-//     }
-//
-//     #[test]
-//     fn test_ignore() {
-//         let gitignore_content = b"abc.txt";
-//         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
-//
-//         assert!(ignore.matches(&PathBuf::from("abc.txt")));
-//         assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
-//     }
-// }
-
-// TODO: IGNORE ISN'T MATCHING PROPERLY!!
-// I think it's because of relative paths and stuff...
-// Gotta figure out how exactly Rust is doing this!!
