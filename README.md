@@ -1,6 +1,6 @@
 # grrs - grep, but built in Rust
 
-Follows the tutorial from: https://rust-cli.github.io/book/index.html 
+Wrote this to learn Rust and other related stuff (i.e. gitignore, file walking)
 
 ## Features
 
@@ -31,3 +31,8 @@ target/release/grrs --help
 
 * https://git-scm.com/docs/gitignore
 * https://wasabifan.github.io/combinator-quick-reference/
+* https://rust-cli.github.io/book/index.html 
+* BurntSushi's ripgrep, ignore, globset crates
+    * https://github.com/BurntSushi/ripgrep/blob/master/crates/ignore/src/gitignore.rs
+    * https://github.com/BurntSushi/ripgrep/blob/master/crates/globset/src/lib.rs
+    * https://github.com/BurntSushi/ripgrep/blob/master/crates/ignore/src/walk.rs

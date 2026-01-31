@@ -208,28 +208,16 @@ impl GitIgnore {
         )
     }
 
-    pub fn matches(&self, path: &Path) -> bool {
-        // TODO: Rewrite this
-        // It should take in a string instead of a Path object
+    pub fn matches(&self, path: &Path, is_dir: bool) -> bool {
+        let path = path.strip_prefix("./").unwrap_or(path);
+        let path = path.strip_prefix(&self.root_path).unwrap_or(path);
 
-        // TODO: If path is a directory, it MUST end with a trailing slash!
-
-        if self.root_path.as_os_str().is_empty() {
-            return self.patterns.is_match(&path.to_string_lossy());
+        let mut path = path.to_string_lossy();
+        if is_dir {
+            path.to_mut().push('/');
         }
 
-        println!("strip prefix {:?} {:?}", path, self.root_path);
-
-        let Ok(path) = path.strip_prefix("./") else {
-            return false;
-        };
-        let Ok(path) = path.strip_prefix(&self.root_path) else {
-            return false;
-        };
-
-        println!(" -> {:?}", path);
-
-        self.patterns.is_match(&path.to_string_lossy())
+        self.patterns.is_match(&path)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -329,10 +317,10 @@ mod tests {
         let gitignore_content = b"abc.txt";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("abc.txt")));
-        assert!(ignore.matches(&PathBuf::from("src/abc.txt")));
-        assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt")));
-        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
+        assert!(ignore.matches(&PathBuf::from("abc.txt"), false));
+        assert!(ignore.matches(&PathBuf::from("src/abc.txt"), false));
+        assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt"), false));
+        assert!(!ignore.matches(&PathBuf::from("xyz.txt"), false));
     }
 
     #[test]
@@ -341,9 +329,9 @@ mod tests {
         let gitignore_content = b"def";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("def")));
-        assert!(!ignore.matches(&PathBuf::from("abcdef")));
-        assert!(!ignore.matches(&PathBuf::from("defghi")));
+        assert!(ignore.matches(&PathBuf::from("def"), false));
+        assert!(!ignore.matches(&PathBuf::from("abcdef"), false));
+        assert!(!ignore.matches(&PathBuf::from("defghi"), false));
     }
 
     #[test]
@@ -352,9 +340,9 @@ mod tests {
         let gitignore_content = b"a/**/b";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("a/b")));
-        assert!(ignore.matches(&PathBuf::from("a/x/b")));
-        assert!(ignore.matches(&PathBuf::from("a/x/y/b")));
+        assert!(ignore.matches(&PathBuf::from("a/b"), false));
+        assert!(ignore.matches(&PathBuf::from("a/x/b"), false));
+        assert!(ignore.matches(&PathBuf::from("a/x/y/b"), false));
     }
 
     #[test]
@@ -363,8 +351,8 @@ mod tests {
         let gitignore_content = b"/root_only.txt";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("root_only.txt")));
-        assert!(!ignore.matches(&PathBuf::from("subdir/root_only.txt")));
+        assert!(ignore.matches(&PathBuf::from("root_only.txt"), false));
+        assert!(!ignore.matches(&PathBuf::from("subdir/root_only.txt"), false));
     }
 
     #[test]
@@ -372,9 +360,9 @@ mod tests {
         let gitignore_content = b"*.log";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("error.log")));
-        assert!(ignore.matches(&PathBuf::from("build/output.log")));
-        assert!(!ignore.matches(&PathBuf::from("log.txt")));
+        assert!(ignore.matches(&PathBuf::from("error.log"), false));
+        assert!(ignore.matches(&PathBuf::from("build/output.log"), false));
+        assert!(!ignore.matches(&PathBuf::from("log.txt"), false));
     }
 
     #[test]
@@ -383,10 +371,12 @@ mod tests {
         let gitignore_content = b"target/";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("target/debug/app")));
-        assert!(ignore.matches(&PathBuf::from("src/target/old_build")));
-        assert!(ignore.matches(&PathBuf::from("target/")));
-        assert!(!ignore.matches(&PathBuf::from("target"))); // should not match file
+        assert!(ignore.matches(&PathBuf::from("target/debug/app"), false));
+        assert!(ignore.matches(&PathBuf::from("target/debug/app"), true));
+        assert!(ignore.matches(&PathBuf::from("src/target/old_build"), false));
+        assert!(ignore.matches(&PathBuf::from("src/target/old_build"), true));
+        assert!(!ignore.matches(&PathBuf::from("target"), false)); // should not match file
+        assert!(ignore.matches(&PathBuf::from("target/"), true)); // should match directory
     }
 
     #[test]
@@ -395,7 +385,7 @@ mod tests {
         let gitignore_content = br"data()\[1\].{txt}";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("data()[1].{txt}")));
+        assert!(ignore.matches(&PathBuf::from("data()[1].{txt}"), false));
     }
 
     #[test]
@@ -404,7 +394,7 @@ mod tests {
         let gitignore_content = br"file\\name";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from(r"file\name")));
+        assert!(ignore.matches(&PathBuf::from(r"file\name"), false));
     }
 
     #[test]
@@ -413,7 +403,7 @@ mod tests {
         let gitignore_content = br"file?name";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from(r"file\name")));
+        assert!(ignore.matches(&PathBuf::from(r"file\name"), false));
     }
 
     #[test]
@@ -422,7 +412,7 @@ mod tests {
         let gitignore_content = br"file*name";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from(r"file\name")));
+        assert!(ignore.matches(&PathBuf::from(r"file\name"), false));
     }
 
     #[test]
@@ -431,8 +421,8 @@ mod tests {
         let gitignore_content = br"file\";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(!ignore.matches(&PathBuf::from(r"")));
-        assert!(!ignore.matches(&PathBuf::from(r"file")));
+        assert!(!ignore.matches(&PathBuf::from(r""), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file"), false));
     }
 
     #[test]
@@ -441,10 +431,10 @@ mod tests {
         let gitignore_content = br"file-[a-z]";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from(r"file-a")));
-        assert!(ignore.matches(&PathBuf::from(r"file-z")));
-        assert!(!ignore.matches(&PathBuf::from(r"file-3")));
-        assert!(!ignore.matches(&PathBuf::from(r"file-B")));
-        assert!(!ignore.matches(&PathBuf::from(r"file-[a-z]")));
+        assert!(ignore.matches(&PathBuf::from(r"file-a"), false));
+        assert!(ignore.matches(&PathBuf::from(r"file-z"), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file-3"), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file-B"), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file-[a-z]"), false));
     }
 }

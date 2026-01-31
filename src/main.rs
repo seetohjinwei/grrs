@@ -51,20 +51,6 @@ fn main() -> Result<()> {
         grrs::ignore::GitIgnore::empty()
     };
 
-    println!("gitignore is empty? {}", gitignore.is_empty(),);
-    println!(
-        "gitignore matches this? {}",
-        gitignore.matches(&std::path::PathBuf::from(
-            "/Users/jinwei/git/grrs/target/debug/deps/aho_corasick-5b59191718e068af.d"
-        ))
-    );
-    println!(
-        "gitignore matches this? {}",
-        gitignore.matches(&std::path::PathBuf::from(
-            "/Users/jinwei/git/grrs/target/debug/deps/libaho_corasick-5b59191718e068af.rmeta:"
-        ))
-    );
-
     let walker = grrs::walker::Walker::new(gitignore);
     // TODO: We should only walk on directories
     // so that we can naturally run it on ignored files

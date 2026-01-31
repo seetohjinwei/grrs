@@ -59,16 +59,6 @@ impl Walker {
     }
 
     fn search_path(&mut self, path: PathBuf, remaining_depth: u32) -> Result<()> {
-        println!(
-            "gitignore matches {:?}? {}",
-            path,
-            self.gitignore.matches(&path),
-        );
-
-        if self.gitignore.matches(&path) {
-            return Ok(());
-        }
-
         if !self.seen_paths.insert(path.clone()) {
             // insert returns False if it was already in the Set
             return Ok(());
@@ -83,6 +73,9 @@ impl Walker {
         }
 
         if metadata.is_file() {
+            if self.gitignore.matches(&path, false) {
+                return Ok(());
+            }
             if self.is_text_file(&path) {
                 self.file_paths.push(path);
             }
@@ -90,6 +83,10 @@ impl Walker {
         }
 
         if !metadata.is_dir() {
+            return Ok(());
+        }
+
+        if self.gitignore.matches(&path, true) {
             return Ok(());
         }
 
