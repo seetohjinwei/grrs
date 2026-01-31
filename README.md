@@ -27,6 +27,20 @@ cargo build --release
 target/release/grrs --help
 ```
 
+## Planned features
+
+* Context flag `-C`
+    * Display X leading and trailing context surrounding each match
+* Smart context mode (switched on by default)
+    * Intended for searching certain strings like `TODO:` that are typically found at the start of a context block
+    * Using the prefix before the match, e.g. for `  # TODO:`, `  # ` is the prefix, all continuous lines that share the same prefix are considered as part of the same context
+* Highlight the matched substring in a matched line
+* Accept pipe as input
+    * So that we can do stuff like `grrs --help | grrs context`
+* Rename the project to be easier to type. Ideas:
+    * gr / gre: grep but faster
+    * sg: [s]earch [g]rep -- default keybinding for my nvconf; it's also homerow
+
 ## Reference links
 
 * https://git-scm.com/docs/gitignore
