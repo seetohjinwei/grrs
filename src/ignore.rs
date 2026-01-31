@@ -73,10 +73,10 @@ fn convert_part(part: &str) -> Option<String> {
 }
 
 /// Converts pattern from gitignore syntax to regex syntax.
-/// Invalid patterns will return an empty string which will match nothing.
+/// Invalid patterns will return None.
 ///
 /// Reference link: https://git-scm.com/docs/gitignore
-fn convert_pattern(pattern: &str) -> String {
+fn convert_pattern(pattern: &str) -> Option<String> {
     let parts: Vec<String> = crate::escaped_strings::split(pattern, DIR_SEP).collect();
 
     let mut regex = String::new();
@@ -126,7 +126,7 @@ fn convert_pattern(pattern: &str) -> String {
         let Some(part_regex) = convert_part(part) else {
             // An invalid part => the entire pattern is invalid
             // => return an empty string so that it matches nothing
-            return String::new();
+            return None;
         };
         regex.push_str(&part_regex);
         if !is_trailing {
@@ -141,7 +141,7 @@ fn convert_pattern(pattern: &str) -> String {
         regex.push_str(r"(?:/|$)");
     }
 
-    regex
+    Some(regex)
 }
 
 impl GitIgnore {
@@ -171,7 +171,10 @@ impl GitIgnore {
                 todo!("negative patterns are not supported");
             }
 
-            patterns.push(convert_pattern(&pattern));
+            let Some(pattern) = convert_pattern(&pattern) else {
+                continue;
+            };
+            patterns.push(pattern);
         }
 
         let set = RegexSet::new(patterns)?;
@@ -273,39 +276,51 @@ mod tests {
     #[test]
     fn test_convert_pattern() {
         // Empty pattern
-        assert_eq!(convert_pattern(&String::from("")), r"(?:^|/)(?:/|$)");
+        assert_eq!(
+            convert_pattern(&String::from("")),
+            Some(String::from(r"(?:^|/)(?:/|$)"))
+        );
         // Basic file
         assert_eq!(
             convert_pattern(&String::from("abc.txt")),
-            r"(?:^|/)abc\.txt(?:/|$)"
+            Some(String::from(r"(?:^|/)abc\.txt(?:/|$)"))
         );
         // Handle beginning separator
-        assert_eq!(convert_pattern(&String::from("/abc")), r"^abc(?:/|$)");
+        assert_eq!(
+            convert_pattern(&String::from("/abc")),
+            Some(String::from(r"^abc(?:/|$)"))
+        );
         // Handle middle separator
         assert_eq!(
             convert_pattern(&String::from("dir/a.txt")),
-            r"^dir/a\.txt(?:/|$)"
+            Some(String::from(r"^dir/a\.txt(?:/|$)"))
         );
         // Handle ending separator
-        assert_eq!(convert_pattern(&String::from("abc/")), r"(?:^|/)abc/");
+        assert_eq!(
+            convert_pattern(&String::from("abc/")),
+            Some(String::from(r"(?:^|/)abc/"))
+        );
         // Handle trailing double asterisks
-        assert_eq!(convert_pattern(&String::from("dir/**")), r"^dir/.*");
+        assert_eq!(
+            convert_pattern(&String::from("dir/**")),
+            Some(String::from(r"^dir/.*"))
+        );
         // Handle middle double asterisks
         assert_eq!(
             convert_pattern(&String::from("a/**/b")),
-            r"^a/(?:.*/)?b(?:/|$)"
+            Some(String::from(r"^a/(?:.*/)?b(?:/|$)"))
         );
 
         // Handle escaped characters
         assert_eq!(
             convert_pattern(&String::from(r"data()\[1\].{txt}")),
-            r"(?:^|/)data\(\)\[1\]\.\{txt\}(?:/|$)"
+            Some(String::from(r"(?:^|/)data\(\)\[1\]\.\{txt\}(?:/|$)"))
         );
 
         // Handle invalid pattern
         // Backslash at the end of a pattern is invalid
-        assert_eq!(convert_pattern(&String::from(r"abc\")), "");
-        assert_eq!(convert_pattern(&String::from(r"dir/abc\")), "");
+        assert_eq!(convert_pattern(&String::from(r"abc\")), None);
+        assert_eq!(convert_pattern(&String::from(r"dir/abc\")), None);
     }
 
     #[test]
@@ -408,5 +423,28 @@ mod tests {
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
         assert!(ignore.matches(&PathBuf::from(r"file\name")));
+    }
+
+    #[test]
+    fn test_invalid_backslash() {
+        // Test backslashes at end of pattern should not match anything
+        let gitignore_content = br"file\";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(!ignore.matches(&PathBuf::from(r"")));
+        assert!(!ignore.matches(&PathBuf::from(r"file")));
+    }
+
+    #[test]
+    fn test_ranges() {
+        // Test backslashes in file names when pattern has asterisk
+        let gitignore_content = br"file-[a-z]";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from(r"file-a")));
+        assert!(ignore.matches(&PathBuf::from(r"file-z")));
+        assert!(!ignore.matches(&PathBuf::from(r"file-3")));
+        assert!(!ignore.matches(&PathBuf::from(r"file-B")));
+        assert!(!ignore.matches(&PathBuf::from(r"file-[a-z]")));
     }
 }
