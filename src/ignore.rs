@@ -214,6 +214,10 @@ impl GitIgnore {
 
         let mut path = path.to_string_lossy();
         if is_dir {
+            if path == ".git" {
+                // We should always ignore .git directory!
+                return true;
+            }
             path.to_mut().push('/');
         }
 

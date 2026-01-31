@@ -14,8 +14,8 @@ pub struct Walker {
     probe_buffer: [u8; 1024],
 }
 
-// TODO: Support naturally discover .gitignore files
-// We should probably move this into crate::ignore
+// TODO: Support natural discovery of .ignore and .gitignore files
+// Also, we should probably move this into crate::ignore
 
 impl Walker {
     pub fn new(gitignore: ignore::GitIgnore) -> Self {

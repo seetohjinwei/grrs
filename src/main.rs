@@ -37,7 +37,6 @@ fn main() -> Result<()> {
     // TODO: Figure out difference between PathBuf and Path
     // TODO: Avoid borrowing if we can!
 
-    // TODO: Support discovering nested .gitignore files!
     let gitignore_path = std::path::PathBuf::from(".gitignore");
     let gitignore_path = fs::canonicalize(gitignore_path)?;
     debug!(
