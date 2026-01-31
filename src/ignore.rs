@@ -14,9 +14,6 @@ pub struct GitIgnore {
     patterns: RegexSet,
 }
 
-// TODO: Support negative matches `!abc.txt` by maintaining a `include_patterns`
-// current `patterns` should be `exclude_patterns`
-
 /// Removes comment from a pattern.
 fn remove_comment(mut pattern: String) -> String {
     // Finds a comment from a pattern.
@@ -36,7 +33,9 @@ fn clean_pattern(pattern: String) -> String {
     crate::escaped_strings::trim_end(pattern)
 }
 
-fn convert_part(part: &str) -> String {
+/// Converts a part of a pattern.
+/// If a part is invalid, None is returned.
+fn convert_part(part: &str) -> Option<String> {
     let mut regex = String::new();
 
     let mut is_escaped = false;
@@ -69,16 +68,15 @@ fn convert_part(part: &str) -> String {
         }
     }
 
-    regex
+    // > a backslash at the end of a pattern is an invalid pattern that never matches!
+    if is_escaped { None } else { Some(regex) }
 }
 
 /// Converts pattern from gitignore syntax to regex syntax.
+/// Invalid patterns will return an empty string which will match nothing.
 ///
 /// Reference link: https://git-scm.com/docs/gitignore
 fn convert_pattern(pattern: &str) -> String {
-    // TODO: Handle the following rule
-    // a backslash at the end of a pattern is an invalid pattern that never matches!
-
     let parts: Vec<String> = crate::escaped_strings::split(pattern, DIR_SEP).collect();
 
     let mut regex = String::new();
@@ -93,9 +91,6 @@ fn convert_pattern(pattern: &str) -> String {
         let is_leading = i == 0;
         let is_trailing = i == parts.len() - 1;
         let is_double_asterisk = *part == "**";
-
-        // TODO: If there is a separator at the end of the pattern then the pattern will only match directories, otherwise the pattern can match both files and directories.
-        // Maybe we can assert that paths to `GitIgnore::matches` is a directory iff it ends in a `/`
 
         // NOTE: We're using a match statement to prove that these conditions are mutually exclusive :)
         match (
@@ -135,11 +130,19 @@ fn convert_pattern(pattern: &str) -> String {
             _ => {}
         };
 
-        regex.push_str(&convert_part(part));
+        let Some(part_regex) = convert_part(part) else {
+            // An invalid part => the entire pattern is invalid
+            // => return an empty string so that it matches nothing
+            return String::new();
+        };
+        regex.push_str(&part_regex);
         if !is_trailing {
             regex.push('/');
         }
     }
+
+    // The following rule is naturally handled.
+    // > If there is a separator at the end of the pattern then the pattern will only match directories, otherwise the pattern can match both files and directories.
 
     regex
 }
@@ -163,6 +166,12 @@ impl GitIgnore {
             // A blank line matches no files
             if pattern.is_empty() {
                 continue;
+            }
+
+            if pattern.starts_with('!') {
+                // TODO: Support negative matches `!abc.txt` by maintaining a `include_patterns`
+                // current `patterns` should be `exclude_patterns`
+                todo!("negative patterns are not supported");
             }
 
             patterns.push(convert_pattern(&pattern));
@@ -202,6 +211,8 @@ impl GitIgnore {
     pub fn matches(&self, path: &Path) -> bool {
         // TODO: Rewrite this
         // It should take in a string instead of a Path object
+
+        // TODO: If path is a directory, it MUST end with a trailing slash!
 
         if self.root_path.as_os_str().is_empty() {
             return self.patterns.is_match(&path.to_string_lossy());
@@ -272,6 +283,8 @@ mod tests {
         assert_eq!(convert_pattern(&String::from("/abc")), r"^abc");
         // Handle middle separator
         assert_eq!(convert_pattern(&String::from("dir/a.txt")), r"^dir/a\.txt");
+        // Handle ending separator
+        assert_eq!(convert_pattern(&String::from("abc/")), r"abc/");
         // Handle trailing double asterisks
         assert_eq!(convert_pattern(&String::from("dir/**")), r"^dir/.*");
         // Handle trailing middle asterisks
@@ -282,6 +295,11 @@ mod tests {
             convert_pattern(&String::from(r"data()\[1\].{txt}")),
             r"data\(\)\[1\]\.\{txt\}"
         );
+
+        // Handle invalid pattern
+        // Backslash at the end of a pattern is invalid
+        assert_eq!(convert_pattern(&String::from(r"abc\")), "");
+        assert_eq!(convert_pattern(&String::from(r"dir/abc\")), "");
     }
 
     #[test]
@@ -325,6 +343,7 @@ mod tests {
         assert!(ignore.matches(&PathBuf::from("target/debug/app")));
         assert!(ignore.matches(&PathBuf::from("src/target/old_build")));
         assert!(ignore.matches(&PathBuf::from("target/")));
+        assert!(!ignore.matches(&PathBuf::from("target"))); // should not match file
     }
 
     #[test]

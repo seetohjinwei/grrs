@@ -66,6 +66,8 @@ fn main() -> Result<()> {
     );
 
     let walker = grrs::walker::Walker::new(gitignore);
+    // TODO: We should only walk on directories
+    // so that we can naturally run it on ignored files
     let file_paths = walker.collect_file_paths(paths, args.max_depth)?;
 
     // TODO: Parallelize this loop
