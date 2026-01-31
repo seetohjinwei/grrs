@@ -1,3 +1,4 @@
+use log::{debug, error};
 use std::fs;
 
 use anyhow::{Context, Result};
@@ -39,7 +40,7 @@ fn main() -> Result<()> {
     // TODO: Support discovering nested .gitignore files!
     let gitignore_path = std::path::PathBuf::from(".gitignore");
     let gitignore_path = fs::canonicalize(gitignore_path)?;
-    println!(
+    debug!(
         "gitignore_path: {:?} {:?}",
         gitignore_path,
         gitignore_path.parent()
@@ -78,7 +79,7 @@ fn main() -> Result<()> {
             },
         ) {
             Ok(_) => {}
-            Err(err) => eprintln!(
+            Err(err) => error!(
                 "failed to read {}: {}",
                 file_path.display().to_string(),
                 err.root_cause()
