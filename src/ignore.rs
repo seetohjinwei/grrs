@@ -58,8 +58,8 @@ fn convert_part(part: &str) -> Option<String> {
                 regex.push('\\');
                 regex.push(c);
             }
-            '*' => regex.push_str(r"[^\\]*"),
-            '?' => regex.push_str(r"[^\\]"),
+            '*' => regex.push_str(r".*"),
+            '?' => regex.push_str(r"."),
             '\\' => {
                 regex.push(c);
                 is_escaped = !is_escaped;
@@ -92,14 +92,8 @@ fn convert_pattern(pattern: &str) -> String {
         let is_trailing = i == parts.len() - 1;
         let is_double_asterisk = *part == "**";
 
-        // NOTE: We're using a match statement to prove that these conditions are mutually exclusive :)
-        match (
-            is_leading,
-            is_trailing,
-            (has_multiple_separators || has_non_ending_separator),
-            is_double_asterisk,
-        ) {
-            (true, _, true, false) => {
+        if is_leading {
+            if (has_multiple_separators || has_non_ending_separator) && !is_double_asterisk {
                 // 1. If there is a separator at the beginning or middle (or both) of the pattern, then the pattern is relative to the directory level of the particular .gitignore file itself. Otherwise the pattern may also match at any level below the .gitignore level.
                 // e.g. `dir/a.txt` matches `dir/a.txt` but not `dir2/dir/a.txt`.
                 // e.g. `dir/`      matches `dir/`      and     `dir2/dir/`.
@@ -109,26 +103,25 @@ fn convert_pattern(pattern: &str) -> String {
                     // Avoid adding a `/`
                     continue;
                 }
-                // Don't continue because we still need to convert this part.
+            } else {
+                regex.push_str(r"(?:^|/)");
             }
-            (_, true, _, true) => {
+        }
+
+        if is_double_asterisk {
+            if is_trailing {
                 // 3. trailing `/**` matches everything inside some directory
                 // e.g. `abc/**` matches all files inside `abc` recursively
                 regex.push_str(r".*");
-                continue;
-            }
-            (_, _, _, true) => {
+            } else {
                 // 4. a slash followed by two consecutive asterisks then a slash matches zero or more directories
                 // e.g. `a/**/b` matches `a/b`, `a/x/b` and `a/x/y/b`
-                regex.push_str(r".*");
-                if !is_trailing {
-                    regex.push('/');
-                }
-                continue;
+                regex.push_str(r"(?:.*/)?");
             }
-            // NOTE: A part *can* be leading + trailing if there's only one part!
-            _ => {}
-        };
+
+            // Don't parse the pattern
+            continue;
+        }
 
         let Some(part_regex) = convert_part(part) else {
             // An invalid part => the entire pattern is invalid
@@ -143,6 +136,10 @@ fn convert_pattern(pattern: &str) -> String {
 
     // The following rule is naturally handled.
     // > If there is a separator at the end of the pattern then the pattern will only match directories, otherwise the pattern can match both files and directories.
+
+    if !regex.ends_with(".*") && !regex.ends_with('/') {
+        regex.push_str(r"(?:/|$)");
+    }
 
     regex
 }
@@ -276,24 +273,33 @@ mod tests {
     #[test]
     fn test_convert_pattern() {
         // Empty pattern
-        assert_eq!(convert_pattern(&String::from("")), r"");
+        assert_eq!(convert_pattern(&String::from("")), r"(?:^|/)(?:/|$)");
         // Basic file
-        assert_eq!(convert_pattern(&String::from("abc.txt")), r"abc\.txt");
+        assert_eq!(
+            convert_pattern(&String::from("abc.txt")),
+            r"(?:^|/)abc\.txt(?:/|$)"
+        );
         // Handle beginning separator
-        assert_eq!(convert_pattern(&String::from("/abc")), r"^abc");
+        assert_eq!(convert_pattern(&String::from("/abc")), r"^abc(?:/|$)");
         // Handle middle separator
-        assert_eq!(convert_pattern(&String::from("dir/a.txt")), r"^dir/a\.txt");
+        assert_eq!(
+            convert_pattern(&String::from("dir/a.txt")),
+            r"^dir/a\.txt(?:/|$)"
+        );
         // Handle ending separator
-        assert_eq!(convert_pattern(&String::from("abc/")), r"abc/");
+        assert_eq!(convert_pattern(&String::from("abc/")), r"(?:^|/)abc/");
         // Handle trailing double asterisks
         assert_eq!(convert_pattern(&String::from("dir/**")), r"^dir/.*");
-        // Handle trailing middle asterisks
-        assert_eq!(convert_pattern(&String::from("a/**/b")), r"^a/.*/b");
+        // Handle middle double asterisks
+        assert_eq!(
+            convert_pattern(&String::from("a/**/b")),
+            r"^a/(?:.*/)?b(?:/|$)"
+        );
 
         // Handle escaped characters
         assert_eq!(
             convert_pattern(&String::from(r"data()\[1\].{txt}")),
-            r"data\(\)\[1\]\.\{txt\}"
+            r"(?:^|/)data\(\)\[1\]\.\{txt\}(?:/|$)"
         );
 
         // Handle invalid pattern
@@ -312,6 +318,28 @@ mod tests {
         assert!(ignore.matches(&PathBuf::from("src/abc.txt")));
         assert!(ignore.matches(&PathBuf::from("debug/logs/abc.txt")));
         assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
+    }
+
+    #[test]
+    fn test_partial_match() {
+        // Unanchored: should match anywhere
+        let gitignore_content = b"def";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("def")));
+        assert!(!ignore.matches(&PathBuf::from("abcdef")));
+        assert!(!ignore.matches(&PathBuf::from("defghi")));
+    }
+
+    #[test]
+    fn test_double_asterisk() {
+        // Unanchored: should match anywhere
+        let gitignore_content = b"a/**/b";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from("a/b")));
+        assert!(ignore.matches(&PathBuf::from("a/x/b")));
+        assert!(ignore.matches(&PathBuf::from("a/x/y/b")));
     }
 
     #[test]
@@ -356,11 +384,29 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_ignore() {
-        let gitignore_content = b"abc.txt";
+    fn test_backslash() {
+        // Test backslashes in file names
+        let gitignore_content = br"file\\name";
         let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
 
-        assert!(ignore.matches(&PathBuf::from("abc.txt")));
-        assert!(!ignore.matches(&PathBuf::from("xyz.txt")));
+        assert!(ignore.matches(&PathBuf::from(r"file\name")));
+    }
+
+    #[test]
+    fn test_backslash_with_question_mark() {
+        // Test backslashes in file names when pattern has asterisk
+        let gitignore_content = br"file?name";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from(r"file\name")));
+    }
+
+    #[test]
+    fn test_backslash_with_asterisk() {
+        // Test backslashes in file names when pattern has asterisk
+        let gitignore_content = br"file*name";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from(r"file\name")));
     }
 }
