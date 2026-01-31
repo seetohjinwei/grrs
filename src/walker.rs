@@ -59,7 +59,11 @@ impl Walker {
     }
 
     fn search_path(&mut self, path: PathBuf, remaining_depth: u32) -> Result<()> {
-        println!("gitignore matches {:?}? {}", path, self.gitignore.matches(&path),);
+        println!(
+            "gitignore matches {:?}? {}",
+            path,
+            self.gitignore.matches(&path),
+        );
 
         if self.gitignore.matches(&path) {
             return Ok(());
