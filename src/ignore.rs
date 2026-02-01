@@ -9,11 +9,6 @@ use std::path::{Path, PathBuf};
 
 const DIR_SEP: char = '/';
 
-pub struct GitIgnore {
-    root_path: PathBuf,
-    patterns: RegexSet,
-}
-
 /// Removes comment from a pattern.
 fn remove_comment(mut pattern: String) -> String {
     // Finds a comment from a pattern.
@@ -144,17 +139,24 @@ fn convert_pattern(pattern: &str) -> Option<String> {
     Some(regex)
 }
 
+pub struct GitIgnore {
+    root_path: PathBuf,
+    include_patterns: RegexSet,
+    exclude_patterns: RegexSet,
+}
+
 impl GitIgnore {
     pub fn empty() -> Self {
-        let set = RegexSet::empty();
         Self {
             root_path: PathBuf::new(),
-            patterns: set,
+            include_patterns: RegexSet::empty(),
+            exclude_patterns: RegexSet::empty(),
         }
     }
 
     pub fn from<R: BufRead>(ignore_path: PathBuf, reader: R) -> Result<Self> {
-        let mut patterns = Vec::new();
+        let mut include_patterns = Vec::new();
+        let mut exclude_patterns = Vec::new();
 
         for pattern in reader.lines() {
             let pattern = pattern?;
@@ -166,21 +168,22 @@ impl GitIgnore {
             }
 
             if pattern.starts_with('!') {
-                // TODO: Support negative matches `!abc.txt` by maintaining a `include_patterns`
-                // current `patterns` should be `exclude_patterns`
-                todo!("negative patterns are not supported");
+                let Some(pattern) = convert_pattern(&pattern[1..]) else {
+                    continue;
+                };
+                exclude_patterns.push(pattern);
+            } else {
+                let Some(pattern) = convert_pattern(&pattern) else {
+                    continue;
+                };
+                include_patterns.push(pattern);
             }
-
-            let Some(pattern) = convert_pattern(&pattern) else {
-                continue;
-            };
-            patterns.push(pattern);
         }
 
-        let set = RegexSet::new(patterns)?;
         Ok(Self {
             root_path: ignore_path,
-            patterns: set,
+            include_patterns: RegexSet::new(include_patterns)?,
+            exclude_patterns: RegexSet::new(exclude_patterns)?,
         })
     }
 
@@ -221,11 +224,15 @@ impl GitIgnore {
             path.to_mut().push('/');
         }
 
-        self.patterns.is_match(&path)
+        if self.exclude_patterns.is_match(&path) {
+            return false;
+        }
+
+        self.include_patterns.is_match(&path)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.patterns.is_empty()
+        self.include_patterns.is_empty()
     }
 }
 
@@ -440,5 +447,16 @@ mod tests {
         assert!(!ignore.matches(&PathBuf::from(r"file-3"), false));
         assert!(!ignore.matches(&PathBuf::from(r"file-B"), false));
         assert!(!ignore.matches(&PathBuf::from(r"file-[a-z]"), false));
+    }
+
+    #[test]
+    fn test_excluded_matches() {
+        // Test exclude patterns
+        let gitignore_content = b"*\n!file*.txt";
+        let ignore = GitIgnore::from(PathBuf::new(), &gitignore_content[..]).unwrap();
+
+        assert!(ignore.matches(&PathBuf::from(r"abc.txt"), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file.txt"), false));
+        assert!(!ignore.matches(&PathBuf::from(r"file2.txt"), false));
     }
 }
