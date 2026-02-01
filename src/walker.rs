@@ -31,6 +31,7 @@ impl Walker {
         }
     }
 
+    // TODO: Return an iterator so that we can start processing immediately...
     pub fn collect_file_paths(
         mut self,
         paths: Vec<PathBuf>,

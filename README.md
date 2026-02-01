@@ -40,6 +40,12 @@ target/release/grrs --help
 * Rename the project to be easier to type. Ideas:
     * gr / gre: grep but faster
     * sg: [s]earch [g]rep -- default keybinding for my nvconf; it's also homerow
+* Add subcommands that support related features that would benefit from gitignore:
+    * sg grep: what we're doing
+    * sg check-ignore: for debugging
+    * sg ls: `git ls-files`
+    * sg tree: `tree --gitignore`
+    * sg wc: `wc` (with ignore functionality)
 
 ## Reference links
 
