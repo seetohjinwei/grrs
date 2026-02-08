@@ -29,6 +29,10 @@ target/release/grrs --help
 
 ## Planned features
 
+* Improve edge cases for walk fn
+    * `sg pattern target/` where `target/` is gitignore'd in `./`, but because the walk fn does not look at `./`, it never discovers `./.gitignore`.
+        * Simple solution: Always check for `.gitignore` in current working directory
+        * More robust solution: If the path is relative to current working directory (does not necessarily mean that the provided path is a relative path -- it can still be an absolute path, but relative to cwd), walk to it from current working directory, picking up all `.gitignore` along the way
 * Context flag `-C`
     * Display X leading and trailing context surrounding each match
 * Smart context mode (switched on by default)
@@ -40,12 +44,13 @@ target/release/grrs --help
 * Rename the project to be easier to type. Ideas:
     * gr / gre: grep but faster
     * sg: [s]earch [g]rep -- default keybinding for my nvconf; it's also homerow
+    * ss: because we want to support subcommands! Then, we can alias `sg` to `ss grep`
 * Add subcommands that support related features that would benefit from gitignore:
-    * sg grep: what we're doing
-    * sg check-ignore: for debugging
-    * sg ls: `git ls-files`
-    * sg tree: `tree --gitignore`
-    * sg wc: `wc` (with ignore functionality)
+    * ss grep: what we're doing
+    * ss check-ignore: for debugging
+    * ss ls: `git ls-files`
+    * ss tree: `tree --gitignore`
+    * ss wc: `wc` (with ignore functionality)
 
 ## Reference links
 
