@@ -29,6 +29,7 @@ target/release/grrs --help
 
 ## Planned features
 
+* Naturally discover .gitignore files
 * Context flag `-C`
     * Display X leading and trailing context surrounding each match
 * Smart context mode (switched on by default)
