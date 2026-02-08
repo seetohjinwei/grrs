@@ -141,8 +141,7 @@ fn convert_pattern(pattern: &str) -> Option<String> {
     Some(regex)
 }
 
-// TODO: Delete walker.rs and make this private!
-pub struct GitIgnore {
+struct GitIgnore {
     root_path: PathBuf,
     include_patterns: RegexSet,
     exclude_patterns: RegexSet,
@@ -247,10 +246,6 @@ impl GitIgnore {
         }
 
         self.include_patterns.is_match(&path)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.include_patterns.is_empty()
     }
 }
 
