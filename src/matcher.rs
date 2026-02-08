@@ -1,7 +1,7 @@
+use std::io::BufRead;
+
 use anyhow::{Context, Result};
 use regex::RegexBuilder;
-
-use std::io::BufRead;
 
 pub struct MatchOptions {
     pub show_line_numbers: bool,

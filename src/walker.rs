@@ -1,10 +1,10 @@
-use anyhow::Result;
-
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
 
 use crate::ignore;
+
+use anyhow::Result;
 
 pub struct Walker {
     gitignore: ignore::GitIgnore,
@@ -74,7 +74,7 @@ impl Walker {
         }
 
         if metadata.is_file() {
-            if self.gitignore.matches(&path, false) {
+            if self.gitignore.is_match(&path, false) {
                 return Ok(());
             }
             if self.is_text_file(&path) {
@@ -87,7 +87,7 @@ impl Walker {
             return Ok(());
         }
 
-        if self.gitignore.matches(&path, true) {
+        if self.gitignore.is_match(&path, true) {
             return Ok(());
         }
 

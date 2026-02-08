@@ -1,13 +1,13 @@
-use log::{debug, error};
-use std::fs;
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use log::{error};
 
 #[derive(Parser)]
 struct Args {
     pattern: String,
-    paths: Vec<std::path::PathBuf>,
+    path: Option<PathBuf>,
 
     // Flags
     #[arg(short = 'd', long = "max-depth", default_value_t = u32::MAX - 1, help = "Limits the depth of directory traversal. -1 (default) to disable the maximum. 0 to disable recursion.")]
@@ -28,33 +28,12 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let paths = if args.paths.len() == 0 {
-        vec![std::path::PathBuf::from(".")]
-    } else {
-        args.paths
-    };
+    let path = args.path.unwrap_or(PathBuf::from("."));
 
     // TODO: Figure out difference between PathBuf and Path
     // TODO: Avoid borrowing if we can!
 
-    let gitignore_path = std::path::PathBuf::from(".gitignore");
-    let gitignore_path = fs::canonicalize(gitignore_path)?;
-    debug!(
-        "gitignore_path: {:?} {:?}",
-        gitignore_path,
-        gitignore_path.parent()
-    );
-    let gitignore = if gitignore_path.exists() {
-        grrs::ignore::GitIgnore::new(gitignore_path)
-            .unwrap_or_else(|_| grrs::ignore::GitIgnore::empty())
-    } else {
-        grrs::ignore::GitIgnore::empty()
-    };
-
-    let walker = grrs::walker::Walker::new(gitignore);
-    // TODO: We should only walk on directories
-    // so that we can naturally run it on ignored files
-    let file_paths = walker.collect_file_paths(paths, args.max_depth)?;
+    let file_paths = grrs::ignore::walk(path, args.max_depth)?;
 
     // TODO: Parallelize this loop
     // but since we will be sharing std::io::stdout, we will have to create separate writers
