@@ -21,7 +21,7 @@ pub fn find_matches<R: BufRead, W: std::io::Write>(
     reader: R,
     mut writer: W,
     pattern: &str,
-    options: &MatchOptions,
+    options: MatchOptions,
 ) -> Result<()> {
     let pattern_regex = RegexBuilder::new(pattern)
         .case_insensitive(options.case_insensitive)
@@ -55,7 +55,7 @@ mod tests {
             &input[..],
             &mut result,
             &"dolor".to_string(),
-            &MatchOptions::default(),
+            MatchOptions::default(),
         )
         .unwrap();
 

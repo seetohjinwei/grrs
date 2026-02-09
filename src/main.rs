@@ -31,7 +31,6 @@ fn main() -> Result<()> {
     let path = args.path.unwrap_or(PathBuf::from("."));
 
     // TODO: Figure out difference between PathBuf and Path
-    // TODO: Avoid borrowing if we can!
 
     let file_paths = grrs::ignore::walk(path, args.max_depth)?;
 
@@ -51,7 +50,7 @@ fn main() -> Result<()> {
             reader,
             writer,
             &args.pattern,
-            &grrs::matcher::MatchOptions {
+            grrs::matcher::MatchOptions {
                 show_line_numbers: !args.no_line_numbers,
                 case_insensitive: args.ignore_case,
             },
