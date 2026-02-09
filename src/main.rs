@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::{error};
+use log::error;
 
 #[derive(Parser)]
 struct Args {

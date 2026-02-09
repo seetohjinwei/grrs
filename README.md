@@ -56,6 +56,7 @@ target/release/grrs --help
 
 * https://git-scm.com/docs/gitignore
 * https://wasabifan.github.io/combinator-quick-reference/
+* https://stackoverflow.com/questions/24158114/what-are-the-differences-between-rusts-string-and-str
 * https://rust-cli.github.io/book/index.html 
 * BurntSushi's ripgrep, ignore, globset crates
     * https://github.com/BurntSushi/ripgrep/blob/master/crates/ignore/src/gitignore.rs

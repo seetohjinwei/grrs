@@ -12,18 +12,17 @@ use regex::RegexSet;
 const DIR_SEP: char = '/';
 
 /// Removes comment from a pattern.
-fn remove_comment(mut pattern: String) -> String {
+fn remove_comment(pattern: &str) -> &str {
     // Finds a comment from a pattern.
     let Some(comment_index) = crate::escaped_strings::find_char(&pattern, '#') else {
         return pattern;
     };
 
-    pattern.truncate(comment_index);
-    pattern
+    &pattern[..comment_index]
 }
 
 /// Cleans a pattern by removing comments and trailing spaces.
-fn clean_pattern(pattern: String) -> String {
+fn clean_pattern(pattern: &str) -> &str {
     let pattern = remove_comment(pattern);
 
     // Leading spaces should not be ignored
@@ -162,7 +161,7 @@ impl GitIgnore {
 
         for pattern in reader.lines() {
             let pattern = pattern?;
-            let pattern = clean_pattern(pattern);
+            let pattern = clean_pattern(&pattern);
 
             // A blank line matches no files
             if pattern.is_empty() {
@@ -304,7 +303,6 @@ struct Walker {
     gitignore_stack: GitIgnoreStack,
 }
 
-
 /// Walks the path using DFS.
 fn walk_dfs(walker: &mut Walker, path: PathBuf, current_depth: u32) -> Result<()> {
     if current_depth >= walker.max_depth {
@@ -368,7 +366,10 @@ pub fn walk(initial_path: PathBuf, max_depth: u32) -> Result<Vec<PathBuf>> {
 
     walk_dfs(&mut walker, initial_path, 0)?;
 
-    assert!(walker.gitignore_stack.is_empty(), "walk_dfs should have cleaned up all gitignores");
+    assert!(
+        walker.gitignore_stack.is_empty(),
+        "walk_dfs should have cleaned up all gitignores"
+    );
 
     Ok(walker.file_paths)
 }
@@ -380,31 +381,22 @@ mod tests {
     #[test]
     fn test_remove_comment() {
         // Empty pattern has no comment
-        assert_eq!(remove_comment(String::from("")), "");
+        assert_eq!(remove_comment(""), "");
         // Empty comment at start of line
-        assert_eq!(remove_comment(String::from("#")), "");
+        assert_eq!(remove_comment("#"), "");
         // Comment at start of line
-        assert_eq!(remove_comment(String::from("# ABC")), "");
+        assert_eq!(remove_comment("# ABC"), "");
         // Empty comment after some pattern
-        assert_eq!(
-            remove_comment(String::from("/build/  # Build files!")),
-            "/build/  "
-        );
+        assert_eq!(remove_comment("/build/  # Build files!"), "/build/  ");
         // Comment after some pattern
-        assert_eq!(remove_comment(String::from("/build/  #")), "/build/  ");
+        assert_eq!(remove_comment("/build/  #"), "/build/  ");
         // Multiple hashtags
-        assert_eq!(
-            remove_comment(String::from("/build/  # COMMENT! #")),
-            "/build/  "
-        );
+        assert_eq!(remove_comment("/build/  # COMMENT! #"), "/build/  ");
         // Escaped hashtags without a comment
-        assert_eq!(
-            remove_comment(String::from(r"/\#hashtag\#/")),
-            r"/\#hashtag\#/"
-        );
+        assert_eq!(remove_comment(r"/\#hashtag\#/"), r"/\#hashtag\#/");
         // Escaped hashtags with comment
         assert_eq!(
-            remove_comment(String::from(r"/\#hashtag\#/  # COMMENT! #")),
+            remove_comment(r"/\#hashtag\#/  # COMMENT! #"),
             r"/\#hashtag\#/  "
         );
     }
@@ -412,51 +404,39 @@ mod tests {
     #[test]
     fn test_convert_pattern() {
         // Empty pattern
-        assert_eq!(
-            convert_pattern(&String::from("")),
-            Some(String::from(r"(?:^|/)(?:/|$)"))
-        );
+        assert_eq!(convert_pattern(""), Some(String::from(r"(?:^|/)(?:/|$)")));
         // Basic file
         assert_eq!(
-            convert_pattern(&String::from("abc.txt")),
+            convert_pattern("abc.txt"),
             Some(String::from(r"(?:^|/)abc\.txt(?:/|$)"))
         );
         // Handle beginning separator
-        assert_eq!(
-            convert_pattern(&String::from("/abc")),
-            Some(String::from(r"^abc(?:/|$)"))
-        );
+        assert_eq!(convert_pattern("/abc"), Some(String::from(r"^abc(?:/|$)")));
         // Handle middle separator
         assert_eq!(
-            convert_pattern(&String::from("dir/a.txt")),
+            convert_pattern("dir/a.txt"),
             Some(String::from(r"^dir/a\.txt(?:/|$)"))
         );
         // Handle ending separator
-        assert_eq!(
-            convert_pattern(&String::from("abc/")),
-            Some(String::from(r"(?:^|/)abc/"))
-        );
+        assert_eq!(convert_pattern("abc/"), Some(String::from(r"(?:^|/)abc/")));
         // Handle trailing double asterisks
-        assert_eq!(
-            convert_pattern(&String::from("dir/**")),
-            Some(String::from(r"^dir/.*"))
-        );
+        assert_eq!(convert_pattern("dir/**"), Some(String::from(r"^dir/.*")));
         // Handle middle double asterisks
         assert_eq!(
-            convert_pattern(&String::from("a/**/b")),
+            convert_pattern("a/**/b"),
             Some(String::from(r"^a/(?:.*/)?b(?:/|$)"))
         );
 
         // Handle escaped characters
         assert_eq!(
-            convert_pattern(&String::from(r"data()\[1\].{txt}")),
+            convert_pattern(r"data()\[1\].{txt}"),
             Some(String::from(r"(?:^|/)data\(\)\[1\]\.\{txt\}(?:/|$)"))
         );
 
         // Handle invalid pattern
         // Backslash at the end of a pattern is invalid
-        assert_eq!(convert_pattern(&String::from(r"abc\")), None);
-        assert_eq!(convert_pattern(&String::from(r"dir/abc\")), None);
+        assert_eq!(convert_pattern(r"abc\"), None);
+        assert_eq!(convert_pattern(r"dir/abc\"), None);
     }
 
     #[test]

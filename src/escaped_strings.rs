@@ -22,7 +22,7 @@ pub fn find_char(string: &str, target_char: char) -> Option<usize> {
 }
 
 /// Returns a string slice with trailing whitespace removed.
-pub fn trim_end(mut string: String) -> String {
+pub fn trim_end(string: &str) -> &str {
     // We can treat the UTF-8 string as bytes because
     // we only compare against ' ' (SPACE) and ESCAPE_CHAR which are both single-byte characters.
     let bytes = string.as_bytes();
@@ -50,8 +50,7 @@ pub fn trim_end(mut string: String) -> String {
         }
     }
 
-    string.truncate(last_valid_idx);
-    string
+    &string[..last_valid_idx]
 }
 
 pub struct Split<'a> {
@@ -118,71 +117,62 @@ mod tests {
     #[test]
     fn test_find_char() {
         // Empty pattern has no comment
-        assert_eq!(find_char(&String::from(""), '#'), None);
+        assert_eq!(find_char("", '#'), None);
         // Empty char at start of line
-        assert_eq!(find_char(&String::from("#"), '#'), Some(0));
+        assert_eq!(find_char("#", '#'), Some(0));
         // char at start of line
-        assert_eq!(find_char(&String::from("# ABC"), '#'), Some(0));
+        assert_eq!(find_char("# ABC", '#'), Some(0));
         // Empty char after some pattern
-        assert_eq!(
-            find_char(&String::from("/build/  # Build files!"), '#'),
-            Some(9)
-        );
+        assert_eq!(find_char("/build/  # Build files!", '#'), Some(9));
         // char after some pattern
-        assert_eq!(find_char(&String::from("/build/  #"), '#'), Some(9));
+        assert_eq!(find_char("/build/  #", '#'), Some(9));
         // Multiple hashtags
-        assert_eq!(
-            find_char(&String::from("/build/  # COMMENT! #"), '#'),
-            Some(9)
-        );
+        assert_eq!(find_char("/build/  # COMMENT! #", '#'), Some(9));
         // Escaped hashtags without a char
-        assert_eq!(find_char(&String::from(r"/\#hashtag\#/"), '#'), None);
+        assert_eq!(find_char(r"/\#hashtag\#/", '#'), None);
         // Escaped hashtags with char
-        assert_eq!(
-            find_char(&String::from(r"/\#hashtag\#/  # COMMENT! #"), '#'),
-            Some(15)
-        );
+        assert_eq!(find_char(r"/\#hashtag\#/  # COMMENT! #", '#'), Some(15));
 
         // Handling double escape
-        assert_eq!(find_char(&String::from(r"\\?"), '?'), Some(2));
+        assert_eq!(find_char(r"\\?", '?'), Some(2));
         // Handling triple escape
-        assert_eq!(find_char(&String::from(r"\\\?"), '?'), None);
+        assert_eq!(find_char(r"\\\?", '?'), None);
         // Finding escape character (behavior is a bit undefined)
-        assert_eq!(find_char(&String::from(r"\"), '\\'), Some(0));
-        assert_eq!(find_char(&String::from(r"\\"), '\\'), Some(0));
-        assert_eq!(find_char(&String::from(r"\\\\"), '\\'), Some(0));
+        assert_eq!(find_char(r"\", '\\'), Some(0));
+        assert_eq!(find_char(r"\\", '\\'), Some(0));
+        assert_eq!(find_char(r"\\\\", '\\'), Some(0));
 
         // Handling unicode characters
-        assert_eq!(find_char(&String::from(r"🦀 CRAB"), 'C'), Some(5));
-        assert_eq!(find_char(&String::from(r"게 CRAB"), 'C'), Some(4));
+        assert_eq!(find_char(r"🦀 CRAB", 'C'), Some(5));
+        assert_eq!(find_char(r"게 CRAB", 'C'), Some(4));
     }
 
     #[test]
     fn test_trim_end() {
         // Empty string
-        assert_eq!(trim_end(String::from("")), "");
+        assert_eq!(trim_end(""), "");
         // Only spaces
-        assert_eq!(trim_end(String::from("   ")), "");
+        assert_eq!(trim_end("   "), "");
         // No trailing spaces
-        assert_eq!(trim_end(String::from("abc")), "abc");
+        assert_eq!(trim_end("abc"), "abc");
         // Trailing spaces
-        assert_eq!(trim_end(String::from("abc  ")), "abc");
+        assert_eq!(trim_end("abc  "), "abc");
         // Non-trailing spaces
-        assert_eq!(trim_end(String::from(" a b c")), " a b c");
+        assert_eq!(trim_end(" a b c"), " a b c");
         // Trailing escaped spaces
-        assert_eq!(trim_end(String::from(r"abc\ ")), r"abc\ ");
+        assert_eq!(trim_end(r"abc\ "), r"abc\ ");
         // Trailing spaces with escaped spaces
-        assert_eq!(trim_end(String::from(r"abc\  ")), r"abc\ ");
+        assert_eq!(trim_end(r"abc\  "), r"abc\ ");
         // Trailing spaces with escaped spaces with non-trailing spaces
-        assert_eq!(trim_end(String::from(r" a bc\  ")), r" a bc\ ");
+        assert_eq!(trim_end(r" a bc\  "), r" a bc\ ");
 
         // Handling double escape
-        assert_eq!(trim_end(String::from(r"\\ ")), r"\\");
-        assert_eq!(trim_end(String::from(r"\ \ ")), r"\ \ ");
+        assert_eq!(trim_end(r"\\ "), r"\\");
+        assert_eq!(trim_end(r"\ \ "), r"\ \ ");
 
         // Handling unicode characters
-        assert_eq!(trim_end(String::from(" 게")), " 게");
-        assert_eq!(trim_end(String::from("게 ")), "게");
+        assert_eq!(trim_end(" 게"), " 게");
+        assert_eq!(trim_end("게 "), "게");
     }
 
     #[test]
