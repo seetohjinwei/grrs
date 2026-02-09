@@ -30,8 +30,6 @@ fn main() -> Result<()> {
 
     let path = args.path.unwrap_or(PathBuf::from("."));
 
-    // TODO: Figure out difference between PathBuf and Path
-
     let file_paths = grrs::ignore::walk(path, args.max_depth)?;
 
     // TODO: Parallelize this loop
