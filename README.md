@@ -29,6 +29,9 @@ target/release/grrs --help
 
 ## Planned features
 
+* Parallelize the grep functionality
+    * Naive implementation: spawn a single thread per file
+    * Write my own ThreadPool
 * Improve edge cases for walk fn
     * `sg pattern target/` where `target/` is gitignore'd in `./`, but because the walk fn does not look at `./`, it never discovers `./.gitignore`.
         * Simple solution: Always check for `.gitignore` in current working directory
@@ -38,7 +41,7 @@ target/release/grrs --help
 * Smart context mode (switched on by default)
     * Intended for searching certain strings like `TODO:` that are typically found at the start of a context block
     * Using the prefix before the match, e.g. for `  # TODO:`, `  # ` is the prefix, all continuous lines that share the same prefix are considered as part of the same context
-* Highlight the matched substring in a matched line
+* Highlight / colorize the matched substring in a matched line
 * Accept pipe as input
     * So that we can do stuff like `grrs --help | grrs context`
 * Rename the project to be easier to type. Ideas:
