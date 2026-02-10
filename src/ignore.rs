@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use log::warn;
-use regex::RegexSet;
+use regex::RegexSet; // TODO: Rewrite this crate to not depend on this :)
 
 // Check why a file is ignored.
 // git check-ignore -v <FILE> [FILE...]
@@ -355,6 +355,9 @@ fn walk_dfs(walker: &mut Walker, path: PathBuf, current_depth: u32) -> Result<()
     Ok(())
 }
 
+// TODO: Make this an iterator
+// * not that easy because we cannot naturally do recursion in an iterator
+// * we chose to use recursion to simplify the management of `gitignore_stack`
 /// Walks the file tree rooted at `initial_path` (up to `max_depth`), collecting all files into the result.
 pub fn walk(initial_path: PathBuf, max_depth: u32) -> Result<Vec<PathBuf>> {
     let mut walker = Walker {
