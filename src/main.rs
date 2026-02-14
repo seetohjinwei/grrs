@@ -42,7 +42,7 @@ fn main() -> Result<()> {
 
         // header will only be printed if something was actually written
         let header = format!("{}:", file_path.display().to_string());
-        let writer = grrs::writer::LazyWriter::new(std::io::stdout(), header);
+        let writer = grrs::writer::SynchronizedWriter::new(std::io::stdout(), header);
 
         match grrs::matcher::find_matches(
             reader,
