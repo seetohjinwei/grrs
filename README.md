@@ -65,7 +65,6 @@ However, I have plans to parallelize the matching functionality. After that's im
 ## Planned features
 
 * Parallelize the grep functionality
-    * Naive implementation: spawn a single thread per file
     * Write my own ThreadPool
 * Improve edge cases for walk fn
     * `sg pattern target/` where `target/` is gitignore'd in `./`, but because the walk fn does not look at `./`, it never discovers `./.gitignore`.
