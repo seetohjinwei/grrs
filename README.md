@@ -19,6 +19,8 @@ RUST_LOG=debug cargo run -- pattern
 
 cargo fmt
 cargo test
+# To print out `println!` while the program is executing
+cargo test test_thread_pool_simple -- --nocapture
 
 cargo build
 target/debug/grrs --help
@@ -64,8 +66,6 @@ However, I have plans to parallelize the matching functionality. After that's im
 
 ## Planned features
 
-* Parallelize the grep functionality
-    * Write my own ThreadPool
 * Improve edge cases for walk fn
     * `sg pattern target/` where `target/` is gitignore'd in `./`, but because the walk fn does not look at `./`, it never discovers `./.gitignore`.
         * Simple solution: Always check for `.gitignore` in current working directory

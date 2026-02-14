@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::thread;
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
@@ -31,43 +31,45 @@ fn main() -> Result<()> {
 
     let path = args.path.unwrap_or(PathBuf::from("."));
 
+    let thread_pool = grrs::threads::ThreadPool::all_cores();
+
+    let pattern = Arc::new(args.pattern);
+
     let file_paths = grrs::ignore::walk(path, args.max_depth)?;
+    for file_path in file_paths {
+        let pattern = Arc::clone(&pattern);
 
-    thread::scope(|s| {
-        file_paths.iter().for_each(|file_path| {
-            // let pattern = Arc::clone(&pattern);
-            let pattern = &args.pattern;
+        thread_pool.execute(move || {
+            let Ok(f) = std::fs::File::open(&file_path) else {
+                error!("could not read file {:?}", file_path);
+                return;
+            };
+            let reader = std::io::BufReader::new(f);
 
-            s.spawn(move || {
-                let Ok(f) = std::fs::File::open(&file_path) else {
-                    error!("could not read file {:?}", file_path);
-                    return;
-                };
-                let reader = std::io::BufReader::new(f);
+            // header will only be printed if something was actually written
+            let header = format!("{}:", file_path.display());
+            let writer = grrs::writer::SynchronizedWriter::new(std::io::stdout(), header);
 
-                // header will only be printed if something was actually written
-                let header = format!("{}:", file_path.display());
-                let writer = grrs::writer::SynchronizedWriter::new(std::io::stdout(), header);
-
-                match grrs::matcher::find_matches(
-                    reader,
-                    writer,
-                    pattern,
-                    grrs::matcher::MatchOptions {
-                        show_line_numbers: !args.no_line_numbers,
-                        case_insensitive: args.ignore_case,
-                    },
-                ) {
-                    Ok(_) => {}
-                    Err(err) => error!(
-                        "failed to read {}: {}",
-                        file_path.display(),
-                        err.root_cause()
-                    ),
-                };
-            });
+            match grrs::matcher::find_matches(
+                reader,
+                writer,
+                &pattern,
+                grrs::matcher::MatchOptions {
+                    show_line_numbers: !args.no_line_numbers,
+                    case_insensitive: args.ignore_case,
+                },
+            ) {
+                Ok(_) => {}
+                Err(err) => error!(
+                    "failed to read {}: {}",
+                    file_path.display(),
+                    err.root_cause()
+                ),
+            };
         });
-    });
+    }
+
+    thread_pool.wait();
 
     Ok(())
 }
