@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     let file_paths = grrs::ignore::walk(path, args.max_depth)?;
 
     thread::scope(|s| {
-        for file_path in file_paths {
+        file_paths.iter().for_each(|file_path| {
             // let pattern = Arc::clone(&pattern);
             let pattern = &args.pattern;
 
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
                     ),
                 };
             });
-        }
+        });
     });
 
     Ok(())
