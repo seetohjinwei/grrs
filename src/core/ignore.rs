@@ -14,7 +14,7 @@ const DIR_SEP: char = '/';
 /// Removes comment from a pattern.
 fn remove_comment(pattern: &str) -> &str {
     // Finds a comment from a pattern.
-    let Some(comment_index) = crate::escaped_strings::find_char(&pattern, '#') else {
+    let Some(comment_index) = super::escaped_strings::find_char(&pattern, '#') else {
         return pattern;
     };
 
@@ -26,7 +26,7 @@ fn clean_pattern(pattern: &str) -> &str {
     let pattern = remove_comment(pattern);
 
     // Leading spaces should not be ignored
-    crate::escaped_strings::trim_end(pattern)
+    super::escaped_strings::trim_end(pattern)
 }
 
 /// Converts a part of a pattern.
@@ -73,7 +73,7 @@ fn convert_part(part: &str) -> Option<String> {
 ///
 /// Reference link: https://git-scm.com/docs/gitignore
 fn convert_pattern(pattern: &str) -> Option<String> {
-    let parts: Vec<String> = crate::escaped_strings::split(pattern, DIR_SEP).collect();
+    let parts: Vec<String> = super::escaped_strings::split(pattern, DIR_SEP).collect();
 
     let mut regex = String::new();
 

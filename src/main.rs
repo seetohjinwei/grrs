@@ -48,11 +48,11 @@ fn main() -> Result<()> {
 
     let path = args.path.unwrap_or(PathBuf::from("."));
 
-    let thread_pool = grrs::threads::ThreadPool::all_cores();
+    let thread_pool = grrs::core::threads::ThreadPool::all_cores();
 
     let pattern = Arc::new(args.pattern);
 
-    let file_paths = grrs::ignore::walk(path, args.max_depth)?;
+    let file_paths = grrs::core::ignore::walk(path, args.max_depth)?;
     for file_path in file_paths {
         let pattern = Arc::clone(&pattern);
 
@@ -65,13 +65,13 @@ fn main() -> Result<()> {
 
             // header will only be printed if something was actually written
             let header = format!("{}:", file_path.display());
-            let writer = grrs::writer::SynchronizedWriter::new(std::io::stdout(), header);
+            let writer = grrs::core::writer::SynchronizedWriter::new(std::io::stdout(), header);
 
-            match grrs::matcher::find_matches(
+            match grrs::grep::matcher::find_matches(
                 reader,
                 writer,
                 &pattern,
-                grrs::matcher::MatchOptions {
+                grrs::grep::matcher::MatchOptions {
                     show_line_numbers: !args.no_line_numbers,
                     case_insensitive: args.ignore_case,
                 },
