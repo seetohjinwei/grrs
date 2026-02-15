@@ -14,8 +14,8 @@ Wrote this to learn Rust and other related stuff (i.e. gitignore, file walking)
 ```sh
 cargo run -- --help
 
-RUST_LOG=debug cargo run -- pattern src/main.rs
-RUST_LOG=debug cargo run -- pattern
+RUST_LOG=debug cargo run -- grep pattern src/main.rs
+RUST_LOG=debug cargo run -- grep TODO
 
 cargo fmt
 cargo test

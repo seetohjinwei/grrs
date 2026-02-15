@@ -2,11 +2,25 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use log::error;
 
 #[derive(Parser)]
-struct Args {
+struct ProgramArgs {
+    #[arg(short = 'v', long = "verbose", default_value_t = false)]
+    verbose: bool,
+
+    #[clap(subcommand)]
+    subcommand: ProgramSubcommand,
+}
+
+#[derive(Subcommand)]
+enum ProgramSubcommand {
+    Grep(GrepCommand),
+}
+
+#[derive(Parser)]
+struct GrepCommand {
     pattern: String,
     path: Option<PathBuf>,
 
@@ -27,7 +41,10 @@ struct Args {
 fn main() -> Result<()> {
     env_logger::init();
 
-    let args = Args::parse();
+    let args = ProgramArgs::parse();
+    let args = match args.subcommand {
+        ProgramSubcommand::Grep(cmd) => cmd,
+    };
 
     let path = args.path.unwrap_or(PathBuf::from("."));
 
